@@ -1,0 +1,126 @@
+/* ========== Modern CSS Reset ========== */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+* { margin: 0; }
+html:focus-within { scroll-behavior: smooth; }
+body { min-height: 100vh; text-rendering: optimizeSpeed; line-height: 1.5; }
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; }
+button, [role="button"] { cursor: pointer; }
+:where(ul,ol) { list-style: none; padding: 0; }
+:where(a) { text-decoration: none; color: inherit; }
+:where(h1,h2,h3,h4,h5,h6) { font-size: inherit; font-weight: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* ========== App Variables ========== */
+:root{
+  /* Base */
+  --bg:#0b0c10; --ring:#1f232c; --radius:2px;
+
+  /* Tap zones */
+  --zone-size: 8%;          /* per-side width */
+  --zone-vpad: 40%;         /* vertical padding (top & bottom) */
+
+  /* Hints (arrows) */
+  --arrow-size: clamp(28px, 6%, 80px);
+  --hint-blinks: 10;          /* total flashes */
+  --hint-blink-dur: 0.90s;   /* per blink cycle */
+  --hint-fade-dur: 1.2s;     /* fade after blinks */
+}
+
+/* ========== Base Layout ========== */
+html, body { height: 100%; }
+body{
+  background: var(--bg);
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+}
+.wrap{
+  min-height: 100svh;
+  display: grid; place-items: center;
+  padding: clamp(8px, 2vw, 16px);
+}
+
+/* Frame (container for sizing if supported) */
+.frame{
+  width: min(96vw, 1280px);
+  aspect-ratio: 16/9;
+  position: relative; overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--ring);
+  background: #0f1116;
+  /* container-type added below only when supported */
+}
+
+/* ========== Slides stack (preloaded iframes) ========== */
+.deckStack{ position: absolute; inset: 0; z-index: 0; }
+.deckLayer{
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; display: block;
+  opacity: 0; transition: opacity .12s linear;
+  background: #0f1116;
+  pointer-events: none;
+  z-index: 0; /* stays below zones */
+}
+.deckLayer.active{ opacity: 1; pointer-events: auto; z-index: 0; }
+
+/* ========== Hints & Zones — Fallback (no container units) ========== */
+.hints,
+.zones{
+  position: absolute;
+  inset: var(--zone-vpad) 0; /* fallback uses raw % */
+}
+
+/* Use container units when supported; also clamp to avoid squish */
+@supports (height: 1cqh) {
+  .frame { container-type: size; }
+  .hints,
+  .zones { inset: clamp(0px, var(--zone-vpad), 25cqh) 0; }
+}
+
+/* Hints sit under zones and never block input */
+.hints { z-index: 1; pointer-events: none; }
+.hint{
+  position: absolute; top: 50%;
+  width: var(--arrow-size); height: auto;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 6px rgba(255,255,255,.25));
+  pointer-events: none; will-change: opacity;
+
+  /* N blinks, then fade, all timed via CSS vars */
+  animation:
+    hint-blink var(--hint-blink-dur) ease-in-out var(--hint-blinks),
+    hint-fade  var(--hint-fade-dur)  ease-in-out calc(var(--hint-blinks) * var(--hint-blink-dur)) forwards;
+}
+.hint--left  { left:  calc(var(--zone-size) / 2);  transform: translate(-50%, -50%); }
+.hint--right { right: calc(var(--zone-size) / 2);  transform: translate( 50%, -50%); }
+
+@keyframes hint-blink { 0%{opacity:0} 40%{opacity:1} 100%{opacity:0} }
+@keyframes hint-fade  { from{opacity:.6} to{opacity:0} }
+
+/* ========== Touch/click zones (TOP-MOST) ========== */
+/* ========== Touch/click zones (TOP-MOST) ========== */
+.zones{
+  display: flex;
+  justify-content: space-between;
+  /* was: pointer-events:none;  <-- remove this */
+  pointer-events: auto;           /* container can receive events */
+  z-index: 999;                   /* above iframes & hints */
+}
+
+.zone{
+  flex: 0 0 clamp(36px, var(--zone-size), 140px);
+  height: 100%;
+  pointer-events: auto;           /* clickable */
+  background: transparent;
+
+  /* quality-of-life for mobile taps */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  /* debug border (remove if desired) */
+  /* border: 2px solid rgb(0, 179, 255); */
+}

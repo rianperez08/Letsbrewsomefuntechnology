@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Slides Viewer — Preload ALL Slides</title>
+
+<link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+  <div class="wrap">
+    <div class="frame">
+      <div id="stack" class="deckStack" aria-live="off"></div>
+
+      <div class="hints" aria-hidden="true">
+            <img src="./i_left.png"  class="hint hint--left"  alt="">
+            <img src="./i_right.png" class="hint hint--right" alt="">
+        </div>
+
+      <div class="zones" aria-hidden="true">
+        <div class="zone left"  id="zoneLeft"></div>
+        <div class="zone right" id="zoneRight"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ====== CONFIG ======
+  let DECK_ID = "1cvMtsGxN3-8qrZ6HSBz_W3IGzWNKZGQEB5z99XVKQcw";
+  const SLIDE_IDS = [
+    "id.g26ec8711107_0_57","id.g34ae8d0216c_0_311","id.g34ae8d0216c_0_349",
+    "id.g385db22ce05_0_0","id.g3712892552d_3_0","id.g385db22ce05_0_135",
+    "id.g385db22ce05_0_172","id.g385db22ce05_0_229","id.g385db22ce05_0_274",
+    "id.g385db22ce05_0_279","id.g385db22ce05_0_634","id.g385db22ce05_0_638",
+    "id.g385db22ce05_0_643","id.g385db22ce05_0_648","id.g385db22ce05_0_652",
+    "id.g385db22ce05_0_657","id.g385db22ce05_0_680","id.g372ff523020_1_0",
+    "id.g372ff523020_1_6","id.g3711d4ebf99_0_32","id.g3711d4ebf99_0_38",
+    "id.g3712892552d_3_100","id.g3712892552d_3_106","id.g3712892552d_3_110",
+    "id.g3712892552d_3_114","id.g3712892552d_3_119","id.g36f873f792c_2_198",
+    "id.g3712892552d_3_128","id.g373161a5f88_0_0","id.g373161a5f88_0_12",
+    "id.g373161a5f88_0_6","id.g3712892552d_3_145","id.g3712892552d_3_150",
+    "id.g385db22ce05_0_330","id.g385db22ce05_0_335","id.g385db22ce05_0_340"
+  ];
+
+  // URL params: ?src=<deckId|fullURL> & ?slide=<slideId>
+  const qs = new URLSearchParams(location.search);
+  const srcParam = qs.get("src");
+  const START_SLIDE = qs.get("slide") || SLIDE_IDS[0] || "id.p";
+  if (srcParam){
+    const did = extractDeckId(srcParam);
+    if (did) DECK_ID = did;
+  }
+
+  // ====== Elements ======
+  const stack = document.getElementById("stack");
+  const zoneL = document.getElementById("zoneLeft");
+  const zoneR = document.getElementById("zoneRight");
+
+  // ====== State ======
+  let idx = Math.max(0, SLIDE_IDS.indexOf(START_SLIDE));
+  if (idx === -1) idx = 0;
+  let layers = []; // NodeList of iframes
+
+  // ====== Helpers ======
+  function extractDeckId(urlOrId){
+    try{
+      if (/^[\w-]+$/.test(urlOrId)) return urlOrId;
+      const u = new URL(urlOrId);
+      const m = u.pathname.match(/\/d\/([\w-]+)/);
+      return m ? m[1] : null;
+    } catch { return null; }
+  }
+  function slideUrl(id){
+    const u = new URL(`https://docs.google.com/presentation/d/${DECK_ID}/embed`);
+    u.searchParams.set("start","false");
+    u.searchParams.set("loop","false");
+    u.searchParams.set("delayms","0");
+    u.searchParams.set("rm","minimal");
+    if (id) u.searchParams.set("slide", id);
+    return u.toString();
+  }
+
+  function buildAllIframes(){
+    const frag = document.createDocumentFragment();
+    SLIDE_IDS.forEach((sid, i) => {
+      const f = document.createElement("iframe");
+      f.className = "deckLayer" + (i === idx ? " active" : "");
+      f.title = `Slide ${i+1}`;
+      f.allowFullscreen = true;
+      f.setAttribute("allow","autoplay; fullscreen");
+      f.referrerPolicy = "no-referrer-when-downgrade";
+      f.src = slideUrl(sid);              // preload now (all at once)
+      // Optional: keep tab key on the active frame only
+      f.tabIndex = (i === idx) ? 0 : -1;
+      frag.appendChild(f);
+    });
+    stack.appendChild(frag);
+    layers = Array.from(stack.getElementsByClassName("deckLayer"));
+  }
+
+  function show(i){
+    if (i === idx) return;
+    const old = idx;
+    idx = Math.max(0, Math.min(SLIDE_IDS.length - 1, i));
+    if (idx === old) return;
+
+    // Toggle classes + tab focus
+    layers[old]?.classList.remove("active");
+    layers[old]?.setAttribute("tabindex","-1");
+    layers[idx]?.classList.add("active");
+    layers[idx]?.setAttribute("tabindex","0");
+    // Optionally focus the new active so arrow keys are handled inside if needed:
+    // layers[idx]?.focus();
+  }
+
+  function goNext(){ 
+    console.log("left");
+    if (idx < SLIDE_IDS.length - 1) show(idx + 1); }
+  function goPrev(){ if (idx > 0) show(idx - 1); }
+
+  // ====== Inputs ======
+  zoneL.addEventListener("click", goPrev);
+  zoneR.addEventListener("click", goNext);
+
+  // Simple swipe
+  let touchX=null, touchY=null, t0=0;
+  const SWIPE_MIN=40, SWIPE_TIME=600;
+  function onTouchStart(e){ const t=e.changedTouches[0]; touchX=t.clientX; touchY=t.clientY; t0=Date.now(); }
+  function onTouchEnd(e){
+    if (touchX==null) return;
+    const t=e.changedTouches[0], dx=t.clientX-touchX, dy=t.clientY-touchY, dt=Date.now()-t0;
+    touchX=touchY=null;
+    if (dt<=SWIPE_TIME && Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>=SWIPE_MIN){
+      if (dx<0) goNext(); else goPrev();
+    }
+  }
+  zoneL.addEventListener("touchstart", onTouchStart, {passive:true});
+  zoneR.addEventListener("touchstart", onTouchStart, {passive:true});
+  zoneL.addEventListener("touchend",   onTouchEnd,   {passive:true});
+  zoneR.addEventListener("touchend",   onTouchEnd,   {passive:true});
+
+  // Keyboard
+  window.addEventListener("keydown",(e)=>{
+    const t=e.target, tag=t && t.tagName;
+    if (tag==="INPUT"||tag==="TEXTAREA"||t?.isContentEditable) return;
+    if (e.key==="ArrowRight"){ e.preventDefault(); goNext(); }
+    else if (e.key==="ArrowLeft"){ e.preventDefault(); goPrev(); }
+  });
+
+  // ====== Init ======
+  buildAllIframes();      // load every slide once
+})();
+</script>
+</body>
+</html>
